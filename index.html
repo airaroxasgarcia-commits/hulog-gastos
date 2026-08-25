@@ -347,6 +347,29 @@
   }
   .netband .value.neg{ color: var(--rust); }
 
+  .balance-carry{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top: 20px;
+    padding: 8px 4px 0;
+    border-top: 1px dashed rgba(75,90,86,0.4);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .balance-carry .value{ font-weight:700; color: var(--green-deep); }
+  .balance-carry .value.neg{ color: var(--rust); }
+
+  .netband.running{
+    margin-top: 10px;
+    background: var(--green-deep);
+    border-color: var(--green-deep);
+  }
+  .netband.running .label,
+  .netband.running .value{ color: #EDF2E6; }
+  .netband.running .value.neg{ color: #FFC9BB; }
+
   .foot-note{
     margin-top: 20px;
     font-family:'Inter';
@@ -371,6 +394,8 @@
     border-bottom: 2px solid var(--green-deep);
   }
   table.summary th:first-child{ text-align:left; }
+  table.summary td.run{ color: var(--green-deep); font-weight:700; }
+  table.summary td.run.neg{ color: var(--rust); }
   table.summary td{
     padding: 7px 4px;
     border-bottom: 1px dashed rgba(175,199,166,0.7);
@@ -497,6 +522,40 @@
   }
   .receipt-actions .addbtn{ padding: 9px 18px; font-size:14px; }
   .receipt-actions .addbtn:disabled{ opacity:0.6; cursor:default; }
+
+  .summary-range-controls{
+    max-width: 380px;
+    margin: 0 auto 14px;
+    font-family:'Inter';
+    font-size: 13px;
+  }
+  .range-toggle{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    cursor:pointer;
+    color: var(--ink-soft);
+    user-select:none;
+  }
+  .range-toggle input{ cursor:pointer; }
+  .range-inputs{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:10px;
+    justify-content:center;
+    flex-wrap: wrap;
+  }
+  .range-inputs input[type="date"]{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    border: 1px solid var(--rule-h);
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 4px;
+    color: var(--ink);
+  }
+  .range-inputs span{ color: var(--ink-soft); font-size:12px; }
 </style>
 </head>
 <body>
@@ -585,15 +644,34 @@
     </div>
   </section>
 
+  <div class="balance-carry">
+    <span class="label" id="balanceCarryLabel">Starting Balance (carried over)</span>
+    <span class="value" id="startingBalanceValue">₱0.00</span>
+  </div>
   <div class="netband">
-    <span class="label">Balance today (Hulog − Gastos)</span>
+    <span class="label">Today's Net (Hulog − Gastos)</span>
     <span class="value" id="netValue">₱0.00</span>
+  </div>
+  <div class="netband running">
+    <span class="label">Running Balance (thru today)</span>
+    <span class="value" id="runningValue">₱0.00</span>
   </div>
 
   <section class="block" id="daySummarySection" style="display:none; margin-top:30px;">
     <div class="block-head">
-      <span class="eyebrow">Screenshot-ready</span>
-      <h2>Buod ng Araw · Day Summary</h2>
+      <span class="eyebrow" id="daySummaryEyebrow">Screenshot-ready</span>
+      <h2 id="daySummaryHeading">Buod ng Araw · Day Summary</h2>
+    </div>
+    <div class="summary-range-controls">
+      <label class="range-toggle">
+        <input type="checkbox" id="rangeModeToggle">
+        <span>Summarize multiple days (e.g. Day 1 to Day 3)</span>
+      </label>
+      <div class="range-inputs" id="rangeInputs" style="display:none;">
+        <input type="date" id="rangeStart">
+        <span>to</span>
+        <input type="date" id="rangeEnd">
+      </div>
     </div>
     <div class="receipt" id="receiptCard">
       <div class="receipt-brand">🌿 Hulog &amp; Gastos</div>
@@ -777,6 +855,39 @@ function computeTotals(){
   const netEl = document.getElementById('netValue');
   netEl.textContent = (net<0? '−':'') + PESO(Math.abs(net));
   netEl.classList.toggle('neg', net<0);
+
+  // Carry the balance forward: everything saved/spent on prior days
+  // becomes today's starting point, so money flows continuously day to day.
+  const todayKey = fmtDateKey(currentDate);
+  const startingBalance = computeCumulativeBefore(todayKey);
+  const runningBalance = startingBalance + net;
+
+  const startEl = document.getElementById('startingBalanceValue');
+  startEl.textContent = (startingBalance<0?'−':'') + PESO(Math.abs(startingBalance));
+  startEl.classList.toggle('neg', startingBalance<0);
+
+  const carryLabelEl = document.getElementById('balanceCarryLabel');
+  const prevDay = new Date(currentDate);
+  prevDay.setDate(prevDay.getDate()-1);
+  carryLabelEl.textContent = `Starting Balance (as of ${prevDay.toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})})`;
+
+  const runEl = document.getElementById('runningValue');
+  runEl.textContent = (runningBalance<0?'−':'') + PESO(Math.abs(runningBalance));
+  runEl.classList.toggle('neg', runningBalance<0);
+}
+
+// Sums the net (hulog - gastos) of every saved day strictly before dateKey,
+// so each day's balance picks up where the previous day left off.
+function computeCumulativeBefore(dateKey){
+  let total = 0;
+  store.list('day:').forEach(k => {
+    const dk = k.replace(/^day:/,'');
+    if(dk < dateKey){
+      const d = loadDayRaw(dk);
+      if(d) total += sumDay(d).net;
+    }
+  });
+  return total;
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -795,10 +906,100 @@ function computePersonTotals(){
   return { totals, order };
 }
 
-function renderDaySummary(){
-  document.getElementById('receiptDate').textContent = fmtDateLong(currentDate);
+function loadDayRaw(dateKey){
+  const res = store.get('day:'+dateKey);
+  if(!res) return null;
+  try{ return JSON.parse(res.value); }catch(e){ return null; }
+}
 
-  const { totals: personTotals, order: names } = computePersonTotals();
+// Inclusive list of yyyy-mm-dd keys between two Date objects.
+function dateRangeKeys(startDate, endDate){
+  const keys = [];
+  const d = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+  while(d <= end){
+    keys.push(fmtDateKey(d));
+    d.setDate(d.getDate()+1);
+  }
+  return keys;
+}
+
+// Sum each person's hulog (morning+evening) across every day in the range.
+function computeRangePersonTotals(dateKeys){
+  const totals = {};
+  const found = [];
+  dateKeys.forEach(dk => {
+    const d = loadDayRaw(dk);
+    if(!d || !d.savings) return;
+    ['morning','evening'].forEach(slot=>{
+      const obj = d.savings[slot] || {};
+      Object.entries(obj).forEach(([name,val])=>{
+        if(!(name in totals)){ totals[name] = 0; found.push(name); }
+        totals[name] += Number(val)||0;
+      });
+    });
+  });
+  const known = [];
+  ['morning','evening'].forEach(slot=>{
+    config.persons[slot].forEach(n=>{ if(!known.includes(n)) known.push(n); });
+  });
+  const order = known.filter(n=>n in totals).concat(found.filter(n=>!known.includes(n)));
+  return { totals, order };
+}
+
+// Sum each expense category across every day in the range.
+function computeRangeCategoryTotals(dateKeys){
+  const totals = {};
+  const found = [];
+  dateKeys.forEach(dk => {
+    const d = loadDayRaw(dk);
+    if(!d || !d.expenses) return;
+    Object.entries(d.expenses).forEach(([cat, arr])=>{
+      if(!(cat in totals)){ totals[cat] = 0; found.push(cat); }
+      totals[cat] += (arr||[]).reduce((s,v)=>s+(Number(v)||0),0);
+    });
+  });
+  const order = config.categories.filter(c=>c in totals).concat(found.filter(c=>!config.categories.includes(c)));
+  return { totals, order };
+}
+
+let receiptFileTag = '';
+
+function renderDaySummary(){
+  const rangeMode = document.getElementById('rangeModeToggle').checked;
+  let dateLabel, personTotals, names, catTotals, cats;
+
+  if(rangeMode){
+    const startVal = document.getElementById('rangeStart').value;
+    const endVal = document.getElementById('rangeEnd').value;
+    if(!startVal || !endVal) return;
+    const [sy,sm,sd] = startVal.split('-').map(Number);
+    const [ey,em,ed] = endVal.split('-').map(Number);
+    let startDate = new Date(sy, sm-1, sd);
+    let endDate = new Date(ey, em-1, ed);
+    if(startDate > endDate){ const t = startDate; startDate = endDate; endDate = t; }
+    const keys = dateRangeKeys(startDate, endDate);
+    const startLabel = startDate.toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'});
+    const endLabel = endDate.toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'});
+    dateLabel = keys.length === 1 ? startLabel : `${startLabel} – ${endLabel} · ${keys.length} days`;
+    receiptFileTag = keys.length === 1 ? keys[0] : `${keys[0]}_to_${keys[keys.length-1]}`;
+
+    ({ totals: personTotals, order: names } = computeRangePersonTotals(keys));
+    ({ totals: catTotals, order: cats } = computeRangeCategoryTotals(keys));
+  } else {
+    dateLabel = fmtDateLong(currentDate);
+    receiptFileTag = fmtDateKey(currentDate);
+    ({ totals: personTotals, order: names } = computePersonTotals());
+    catTotals = {};
+    cats = config.categories;
+    config.categories.forEach(cat => {
+      const vals = dayData.expenses[cat] || ['','',''];
+      catTotals[cat] = vals.reduce((s,v)=>s+(Number(v)||0),0);
+    });
+  }
+
+  document.getElementById('receiptDate').textContent = dateLabel;
+
   const hulogRowsEl = document.getElementById('receiptHulogRows');
   hulogRowsEl.innerHTML = '';
   let hulogGrand = 0;
@@ -818,12 +1019,11 @@ function renderDaySummary(){
   const gastosRowsEl = document.getElementById('receiptGastosRows');
   gastosRowsEl.innerHTML = '';
   let gastosGrand = 0;
-  if(config.categories.length === 0){
+  if(cats.length === 0){
     gastosRowsEl.innerHTML = '<div class="receipt-empty">No entries yet</div>';
   }
-  config.categories.forEach(cat => {
-    const vals = dayData.expenses[cat] || ['','',''];
-    const rowTotal = vals.reduce((s,v)=>s+(Number(v)||0),0);
+  cats.forEach(cat => {
+    const rowTotal = catTotals[cat] || 0;
     gastosGrand += rowTotal;
     const row = document.createElement('div');
     row.className = 'receipt-row';
@@ -962,9 +1162,11 @@ async function loadSummary(){
   }), {savings:0, expenses:0, net:0});
 
   let html = `<table class="summary"><thead><tr>
-      <th>Date</th><th>Hulog</th><th>Gastos</th><th>Balance</th>
+      <th>Date</th><th>Hulog</th><th>Gastos</th><th>Daily Net</th><th>Running Balance</th>
     </tr></thead><tbody>`;
+  let running = 0;
   rows.forEach(r => {
+    running += r.net;
     const dObj = new Date(r.date+'T00:00:00');
     const label = dObj.toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'});
     const isToday = r.date === todayKey;
@@ -973,6 +1175,7 @@ async function loadSummary(){
       <td>${PESO(r.savings)}</td>
       <td class="gastos">${PESO(r.expenses)}</td>
       <td class="bal${r.net<0?' neg':''}">${r.net<0?'−':''}${PESO(Math.abs(r.net))}</td>
+      <td class="run${running<0?' neg':''}">${running<0?'−':''}${PESO(Math.abs(running))}</td>
     </tr>`;
   });
   html += `</tbody><tfoot><tr>
@@ -980,6 +1183,7 @@ async function loadSummary(){
       <td>${PESO(grand.savings)}</td>
       <td class="gastos">${PESO(grand.expenses)}</td>
       <td class="bal${grand.net<0?' neg':''}">${grand.net<0?'−':''}${PESO(Math.abs(grand.net))}</td>
+      <td class="run${running<0?' neg':''}">${running<0?'−':''}${PESO(Math.abs(running))}</td>
     </tr></tfoot></table>`;
   body.innerHTML = html;
 
@@ -1009,6 +1213,25 @@ document.getElementById('shareSummaryBtn').addEventListener('click', () => {
   }
 });
 
+document.getElementById('rangeModeToggle').addEventListener('change', (e) => {
+  const on = e.target.checked;
+  document.getElementById('rangeInputs').style.display = on ? 'flex' : 'none';
+  document.getElementById('daySummaryHeading').textContent = on
+    ? 'Buod ng Ilang Araw · Multi-Day Summary'
+    : 'Buod ng Araw · Day Summary';
+  document.getElementById('daySummaryEyebrow').textContent = on ? 'Screenshot-ready · Range' : 'Screenshot-ready';
+  if(on){
+    const rs = document.getElementById('rangeStart');
+    const re = document.getElementById('rangeEnd');
+    if(!rs.value) rs.value = fmtDateKey(currentDate);
+    if(!re.value) re.value = fmtDateKey(currentDate);
+  }
+  renderDaySummary();
+});
+
+document.getElementById('rangeStart').addEventListener('change', renderDaySummary);
+document.getElementById('rangeEnd').addEventListener('change', renderDaySummary);
+
 document.getElementById('downloadImgBtn').addEventListener('click', async () => {
   const btn = document.getElementById('downloadImgBtn');
   const original = btn.textContent;
@@ -1021,7 +1244,7 @@ document.getElementById('downloadImgBtn').addEventListener('click', async () => 
   try{
     const card = document.getElementById('receiptCard');
     const canvas = await html2canvas(card, { backgroundColor: '#F7F3E8', scale: 2 });
-    const fileName = `hulog-gastos-${fmtDateKey(currentDate)}.png`;
+    const fileName = `hulog-gastos-${receiptFileTag || fmtDateKey(currentDate)}.png`;
 
     canvas.toBlob(async (blob) => {
       if(!blob){ btn.textContent = original; btn.disabled = false; return; }
