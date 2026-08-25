@@ -16,6 +16,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{
     --paper: #E9EFE2;
@@ -402,6 +403,100 @@
     font-style: italic;
     padding: 4px 0 8px;
   }
+
+  .receipt{
+    background: #F7F3E8;
+    border: 1px solid var(--rule-h);
+    border-radius: 8px;
+    padding: 22px 22px 18px;
+    max-width: 380px;
+    margin: 0 auto;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  .receipt-brand{
+    text-align:center;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--green-deep);
+    margin-bottom: 8px;
+    font-weight:600;
+  }
+  .receipt-date{
+    text-align:center;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  .receipt-title{
+    text-align:center;
+    font-family:'Caveat', cursive;
+    font-size: 30px;
+    font-weight:700;
+    color: var(--green-deep);
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+  }
+  .receipt-section-title{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight:700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--rust);
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 4px;
+    margin: 14px 0 6px;
+  }
+  .receipt-row{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    font-size: 14px;
+    padding: 4px 0;
+    border-bottom: 1px dotted rgba(75,90,86,0.35);
+  }
+  .receipt-name{ color: var(--ink); }
+  .receipt-amt{ font-family:'IBM Plex Mono', monospace; color: var(--ink-soft); white-space:nowrap; }
+  .receipt-total-row{
+    display:flex;
+    justify-content:space-between;
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:700;
+    font-size: 14px;
+    color: var(--green-deep);
+    border-top: 1px solid var(--ink);
+    margin-top: 4px;
+    padding-top: 6px;
+  }
+  .receipt-remaining{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 2px double var(--ink);
+    font-family:'Caveat', cursive;
+    font-size: 22px;
+    font-weight:700;
+    color: #4A3F1A;
+  }
+  .receipt-remaining span:last-child{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 17px;
+  }
+  .receipt-remaining .neg{ color: var(--rust) !important; }
+  .receipt-empty{ font-size:12.5px; font-style:italic; color: var(--ink-soft); padding: 6px 0; }
+  .receipt-actions{
+    display:flex;
+    justify-content:center;
+    margin-top: 16px;
+  }
+  .receipt-actions .addbtn{ padding: 9px 18px; font-size:14px; }
+  .receipt-actions .addbtn:disabled{ opacity:0.6; cursor:default; }
 </style>
 </head>
 <body>
@@ -417,6 +512,7 @@
     <button class="navbtn" id="nextDay" title="Next day">›</button>
     <button class="today-btn" id="todayBtn">Today</button>
     <button class="today-btn" id="summaryBtn" style="margin-left:auto;">📖 All Dates</button>
+    <button class="today-btn" id="shareSummaryBtn">🧾 Summary</button>
   </div>
 
   <section class="block" id="summarySection" style="display:none;">
@@ -493,6 +589,31 @@
     <span class="label">Balance today (Hulog − Gastos)</span>
     <span class="value" id="netValue">₱0.00</span>
   </div>
+
+  <section class="block" id="daySummarySection" style="display:none; margin-top:30px;">
+    <div class="block-head">
+      <span class="eyebrow">Screenshot-ready</span>
+      <h2>Buod ng Araw · Day Summary</h2>
+    </div>
+    <div class="receipt" id="receiptCard">
+      <div class="receipt-brand">🌿 Hulog &amp; Gastos</div>
+      <div class="receipt-date" id="receiptDate"></div>
+      <div class="receipt-title">SUMMARY</div>
+
+      <div class="receipt-section-title">Hulog</div>
+      <div id="receiptHulogRows"></div>
+      <div class="receipt-total-row"><span>TOTAL</span><span id="receiptHulogTotal">₱0.00</span></div>
+
+      <div class="receipt-section-title">Gastos</div>
+      <div id="receiptGastosRows"></div>
+      <div class="receipt-total-row"><span>TOTAL</span><span id="receiptGastosTotal">₱0.00</span></div>
+
+      <div class="receipt-remaining"><span>REMAINING</span><span id="receiptRemaining">₱0.00</span></div>
+    </div>
+    <div class="receipt-actions">
+      <button class="addbtn" id="downloadImgBtn">⬇ Save as Image</button>
+    </div>
+  </section>
 
   <div class="foot-note">Saved on this device only, for this date. Switch dates above to see other days.</div>
 </div>
@@ -661,6 +782,62 @@ function computeTotals(){
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s){ return escapeHtml(s); }
 
+// Combine a person's morning + evening hulog into one total per name, for the summary card.
+function computePersonTotals(){
+  const totals = {};
+  const order = [];
+  ['morning','evening'].forEach(slot=>{
+    config.persons[slot].forEach(name=>{
+      if(!(name in totals)){ totals[name] = 0; order.push(name); }
+      totals[name] += Number(dayData.savings[slot][name]) || 0;
+    });
+  });
+  return { totals, order };
+}
+
+function renderDaySummary(){
+  document.getElementById('receiptDate').textContent = fmtDateLong(currentDate);
+
+  const { totals: personTotals, order: names } = computePersonTotals();
+  const hulogRowsEl = document.getElementById('receiptHulogRows');
+  hulogRowsEl.innerHTML = '';
+  let hulogGrand = 0;
+  if(names.length === 0){
+    hulogRowsEl.innerHTML = '<div class="receipt-empty">No entries yet</div>';
+  }
+  names.forEach(name => {
+    const val = personTotals[name] || 0;
+    hulogGrand += val;
+    const row = document.createElement('div');
+    row.className = 'receipt-row';
+    row.innerHTML = `<span class="receipt-name">${escapeHtml(name)}</span><span class="receipt-amt">${PESO(val)}</span>`;
+    hulogRowsEl.appendChild(row);
+  });
+  document.getElementById('receiptHulogTotal').textContent = PESO(hulogGrand);
+
+  const gastosRowsEl = document.getElementById('receiptGastosRows');
+  gastosRowsEl.innerHTML = '';
+  let gastosGrand = 0;
+  if(config.categories.length === 0){
+    gastosRowsEl.innerHTML = '<div class="receipt-empty">No entries yet</div>';
+  }
+  config.categories.forEach(cat => {
+    const vals = dayData.expenses[cat] || ['','',''];
+    const rowTotal = vals.reduce((s,v)=>s+(Number(v)||0),0);
+    gastosGrand += rowTotal;
+    const row = document.createElement('div');
+    row.className = 'receipt-row';
+    row.innerHTML = `<span class="receipt-name">${escapeHtml(cat)}</span><span class="receipt-amt">${PESO(rowTotal)}</span>`;
+    gastosRowsEl.appendChild(row);
+  });
+  document.getElementById('receiptGastosTotal').textContent = PESO(gastosGrand);
+
+  const remaining = hulogGrand - gastosGrand;
+  const remEl = document.getElementById('receiptRemaining');
+  remEl.textContent = (remaining<0?'−':'') + PESO(Math.abs(remaining));
+  remEl.classList.toggle('neg', remaining<0);
+}
+
 async function renderAll(){
   document.getElementById('dateline').textContent = fmtDateLong(currentDate);
   document.getElementById('datePicker').value = fmtDateKey(currentDate);
@@ -668,6 +845,7 @@ async function renderAll(){
   renderSavingsCol('evening');
   renderExpenseRows();
   computeTotals();
+  renderDaySummary();
 }
 
 async function goToDate(d){
@@ -819,6 +997,60 @@ document.getElementById('summaryBtn').addEventListener('click', async () => {
   const showing = sec.style.display !== 'none';
   sec.style.display = showing ? 'none' : 'block';
   if(!showing) await loadSummary();
+});
+
+document.getElementById('shareSummaryBtn').addEventListener('click', () => {
+  const sec = document.getElementById('daySummarySection');
+  const showing = sec.style.display !== 'none';
+  sec.style.display = showing ? 'none' : 'block';
+  if(!showing){
+    renderDaySummary();
+    sec.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+});
+
+document.getElementById('downloadImgBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('downloadImgBtn');
+  const original = btn.textContent;
+  if(typeof html2canvas === 'undefined'){
+    alert('Image tool did not load (no internet connection?). You can still screenshot the summary above.');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  try{
+    const card = document.getElementById('receiptCard');
+    const canvas = await html2canvas(card, { backgroundColor: '#F7F3E8', scale: 2 });
+    const fileName = `hulog-gastos-${fmtDateKey(currentDate)}.png`;
+
+    canvas.toBlob(async (blob) => {
+      if(!blob){ btn.textContent = original; btn.disabled = false; return; }
+      const file = new File([blob], fileName, { type: 'image/png' });
+
+      if(navigator.canShare && navigator.canShare({ files: [file] })){
+        try{
+          await navigator.share({ files: [file], title: 'Hulog & Gastos Summary' });
+          btn.textContent = original;
+          btn.disabled = false;
+          return;
+        }catch(shareErr){ /* user cancelled or share failed — fall back to download */ }
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+      btn.textContent = original;
+      btn.disabled = false;
+    }, 'image/png');
+  }catch(err){
+    console.error('Image generation failed', err);
+    alert('Could not generate image. You can still take a screenshot of the summary above.');
+    btn.textContent = original;
+    btn.disabled = false;
+  }
 });
 
 document.getElementById('datePicker').addEventListener('change', async (e) => {
