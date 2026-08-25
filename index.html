@@ -531,7 +531,20 @@ const fmtDateKey = d => {
 };
 const fmtDateLong = d => d.toLocaleDateString('en-PH', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
 
-let config = { persons: [], categories: [] };
+let config = { persons: { morning: [], evening: [] }, categories: [] };
+
+// Older saved data may have a single shared "persons" array — split it into
+// separate morning/evening lists (both slots start with the same names) so
+// existing entries aren't lost on upgrade.
+function migrateConfig(cfg){
+  if(Array.isArray(cfg.persons)){
+    cfg.persons = { morning: [...cfg.persons], evening: [...cfg.persons] };
+  }
+  if(!cfg.persons) cfg.persons = { morning: [], evening: [] };
+  if(!cfg.persons.morning) cfg.persons.morning = [];
+  if(!cfg.persons.evening) cfg.persons.evening = [];
+  return cfg;
+}
 let currentDate = new Date();
 let dayData = { savings: {morning:{}, evening:{}}, expenses: {} };
 
@@ -561,7 +574,7 @@ const store = {
 
 async function loadConfig(){
   const res = store.get('config');
-  config = res ? JSON.parse(res.value) : { persons: [], categories: [] };
+  config = res ? migrateConfig(JSON.parse(res.value)) : { persons: { morning: [], evening: [] }, categories: [] };
 }
 async function saveConfig(){
   store.set('config', JSON.stringify(config));
@@ -581,10 +594,11 @@ async function saveDay(){
 function renderSavingsCol(slot){
   const container = document.getElementById(slot+'Rows');
   container.innerHTML = '';
-  if(config.persons.length === 0){
+  const list = config.persons[slot];
+  if(list.length === 0){
     container.innerHTML = '<div class="empty-hint">No one added yet. Add a person below.</div>';
   }
-  config.persons.forEach(name => {
+  list.forEach(name => {
     const val = dayData.savings[slot][name] ?? '';
     const row = document.createElement('div');
     row.className = 'row';
@@ -592,7 +606,7 @@ function renderSavingsCol(slot){
       <span class="name">${escapeHtml(name)}</span>
       <span class="peso">₱</span>
       <input type="number" step="0.01" min="0" class="amt" value="${val}" data-slot="${slot}" data-person="${escapeAttr(name)}">
-      <button class="del" data-remove-person="${escapeAttr(name)}" title="Remove person">✕</button>
+      <button class="del" data-remove-person="${escapeAttr(name)}" data-remove-slot="${slot}" title="Remove person">✕</button>
     `;
     container.appendChild(row);
   });
@@ -623,8 +637,8 @@ function renderExpenseRows(){
 }
 
 function computeTotals(){
-  const morningTotal = config.persons.reduce((s,p)=>s+(Number(dayData.savings.morning[p])||0),0);
-  const eveningTotal = config.persons.reduce((s,p)=>s+(Number(dayData.savings.evening[p])||0),0);
+  const morningTotal = config.persons.morning.reduce((s,p)=>s+(Number(dayData.savings.morning[p])||0),0);
+  const eveningTotal = config.persons.evening.reduce((s,p)=>s+(Number(dayData.savings.evening[p])||0),0);
   document.getElementById('morningTotal').textContent = PESO(morningTotal);
   document.getElementById('eveningTotal').textContent = PESO(eveningTotal);
   document.getElementById('savingsGrand').textContent = PESO(morningTotal+eveningTotal);
@@ -684,7 +698,7 @@ document.addEventListener('click', async (e) => {
     const input = document.getElementById(slot+'NewName');
     const name = input.value.trim();
     if(!name) return;
-    if(!config.persons.includes(name)) config.persons.push(name);
+    if(!config.persons[slot].includes(name)) config.persons[slot].push(name);
     input.value = '';
     await saveConfig();
     await renderAll();
@@ -700,8 +714,10 @@ document.addEventListener('click', async (e) => {
   }
   if(e.target.matches('[data-remove-person]')){
     const name = e.target.dataset.removePerson;
-    if(!confirm(`Remove "${name}" from the savings list?`)) return;
-    config.persons = config.persons.filter(p => p !== name);
+    const slot = e.target.dataset.removeSlot;
+    const label = slot === 'morning' ? 'Umaga' : 'Gabi';
+    if(!confirm(`Remove "${name}" from the ${label} list?`)) return;
+    config.persons[slot] = config.persons[slot].filter(p => p !== name);
     await saveConfig();
     await renderAll();
   }
