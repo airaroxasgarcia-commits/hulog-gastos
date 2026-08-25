@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Hulog & Gastos</title>
+<meta name="description" content="Track daily savings (hulog) and expenses (gastos) — morning and evening.">
+<meta name="theme-color" content="#1F4F38">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hulog">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #E9EFE2;
+    --paper-edge: #DCE5D2;
+    --rule-h: #AFC7A6;
+    --margin-red: #B5544A;
+    --ink: #263238;
+    --ink-soft: #4B5A56;
+    --green: #2E6B4C;
+    --green-deep: #1F4F38;
+    --rust: #9C4630;
+    --gold: #D8C57E;
+    --gold-deep: #B79F4E;
+    --paper-hole: #D3DEC8;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: #C9D4BE;
+    font-family:'Inter', sans-serif;
+    color: var(--ink);
+    min-height:100vh;
+    padding: 24px 12px 60px;
+  }
+  .book{
+    max-width: 780px;
+    margin: 0 auto;
+    background: var(--paper);
+    border-radius: 4px;
+    box-shadow: 0 2px 0 var(--paper-edge), 0 18px 40px rgba(20,30,20,0.25);
+    position: relative;
+    padding: 28px 22px 34px 46px;
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 30px,
+        var(--rule-h) 31px
+      );
+    background-position: 0 92px;
+  }
+  .book::before{
+    content:"";
+    position:absolute;
+    left: 28px;
+    top:0;
+    bottom:0;
+    width: 2px;
+    background: var(--margin-red);
+    opacity:0.55;
+  }
+  .tab{
+    display:inline-flex;
+    align-items:baseline;
+    gap:10px;
+    background: var(--green-deep);
+    color: #EDF2E6;
+    padding: 8px 18px 9px;
+    border-radius: 3px 3px 0 0;
+    font-family:'Caveat', cursive;
+    font-size: 28px;
+    font-weight:700;
+    letter-spacing: 0.5px;
+    transform: translateY(-2px);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+  }
+  .tab .sub{
+    font-family:'Inter', sans-serif;
+    font-size: 11px;
+    font-weight:600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color:#C7D6BE;
+  }
+  h1{
+    font-family:'Caveat', cursive;
+    font-size: 40px;
+    font-weight: 700;
+    margin: 6px 0 2px;
+    color: var(--green-deep);
+    line-height:1;
+  }
+  .dateline{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    letter-spacing:0.5px;
+  }
+  .datebar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin: 16px 0 26px;
+    flex-wrap: wrap;
+  }
+  .navbtn{
+    border:1px solid var(--green-deep);
+    background: transparent;
+    color: var(--green-deep);
+    width:32px; height:32px;
+    border-radius:50%;
+    font-size:16px;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink:0;
+  }
+  .navbtn:hover{ background: var(--green-deep); color:#fff; }
+  input[type="date"]{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 14px;
+    border: 1px solid var(--rule-h);
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 4px;
+    color: var(--ink);
+  }
+  .today-btn{
+    font-family:'Inter';
+    font-size:12px;
+    font-weight:600;
+    color: var(--green-deep);
+    background: none;
+    border: 1px solid var(--green-deep);
+    border-radius: 20px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  .today-btn:hover{ background: var(--green-deep); color:#fff; }
+
+  section.block{ margin-bottom: 34px; }
+  .block-head{
+    display:flex;
+    align-items:baseline;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .block-head .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--rust);
+    font-weight:600;
+  }
+  .block-head h2{
+    font-family:'Caveat', cursive;
+    font-size: 30px;
+    color: var(--ink);
+    margin:0;
+    font-weight:700;
+  }
+
+  .savings-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 560px){
+    .savings-grid{ grid-template-columns: 1fr; }
+  }
+  .col{
+    background: rgba(255,255,255,0.45);
+    border: 1px solid var(--rule-h);
+    border-radius: 6px;
+    padding: 14px 14px 12px;
+  }
+  .col-title{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight:600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--green-deep);
+    margin-bottom: 10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding: 6px 0;
+    border-bottom: 1px dashed rgba(175,199,166,0.7);
+  }
+  .row:last-of-type{ border-bottom:none; }
+  .row .name{
+    flex:1;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .peso{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .amt{
+    width: 92px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 14px;
+    text-align:right;
+    border:1px solid var(--rule-h);
+    border-radius:4px;
+    padding: 5px 7px;
+    background:#fff;
+    color: var(--ink);
+  }
+  .amt:focus{ outline:2px solid var(--green); outline-offset:1px; }
+  .del{
+    background:none; border:none; color: var(--rust);
+    cursor:pointer; font-size: 15px; opacity:0.55; padding:2px 4px;
+    line-height:1;
+  }
+  .del:hover{ opacity:1; }
+  .addrow{
+    display:flex; gap:6px; margin-top: 10px;
+  }
+  .addrow input[type="text"]{
+    flex:1;
+    font-family:'Inter';
+    font-size: 13px;
+    padding: 6px 9px;
+    border:1px solid var(--rule-h);
+    border-radius:4px;
+    background:#fff;
+  }
+  .addbtn{
+    font-family:'Inter';
+    font-size:13px;
+    font-weight:600;
+    background: var(--green);
+    color:#fff;
+    border:none;
+    border-radius:4px;
+    padding: 6px 12px;
+    cursor:pointer;
+  }
+  .addbtn:hover{ background: var(--green-deep); }
+  .col-total{
+    display:flex;
+    justify-content:space-between;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--rule-h);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight:600;
+    color: var(--green-deep);
+  }
+
+  .savings-grand{
+    text-align:right;
+    margin-top: 12px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 15px;
+    font-weight:600;
+    color: var(--green-deep);
+    padding-right: 4px;
+  }
+
+  table.ledger{
+    width:100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.ledger thead th{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    text-align: center;
+    padding: 6px 4px 8px;
+    border-bottom: 2px solid var(--green-deep);
+  }
+  table.ledger thead th:first-child{ text-align:left; }
+  table.ledger td{
+    padding: 6px 4px;
+    border-bottom: 1px dashed rgba(175,199,166,0.7);
+    vertical-align: middle;
+  }
+  table.ledger td.catname{
+    font-size:14px;
+    color: var(--ink);
+  }
+  table.ledger td.rowtotal{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    color: var(--rust);
+    text-align:right;
+    font-size:13px;
+  }
+  table.ledger input.amt{ width: 100%; min-width: 62px; }
+  tfoot td{
+    padding-top: 10px;
+    border-top: 2px solid var(--green-deep);
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:700;
+    font-size: 13px;
+    color: var(--rust);
+    text-align:center;
+  }
+  tfoot td:first-child{ text-align:left; color:var(--ink-soft); font-weight:600; }
+  tfoot td.grand{ text-align:right; }
+
+  .netband{
+    margin-top: 22px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background: var(--gold);
+    border: 1px solid var(--gold-deep);
+    border-radius: 6px;
+    padding: 12px 16px;
+  }
+  .netband .label{
+    font-family:'Caveat', cursive;
+    font-size: 22px;
+    font-weight:700;
+    color: #4A3F1A;
+  }
+  .netband .value{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight:700;
+    color: #4A3F1A;
+  }
+  .netband .value.neg{ color: var(--rust); }
+
+  .foot-note{
+    margin-top: 20px;
+    font-family:'Inter';
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-align:center;
+    opacity:0.75;
+  }
+  table.summary{
+    width:100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.summary th{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    text-align: right;
+    padding: 6px 4px 8px;
+    border-bottom: 2px solid var(--green-deep);
+  }
+  table.summary th:first-child{ text-align:left; }
+  table.summary td{
+    padding: 7px 4px;
+    border-bottom: 1px dashed rgba(175,199,166,0.7);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    text-align: right;
+  }
+  table.summary td:first-child{
+    text-align:left;
+    font-family:'Inter';
+    font-weight:500;
+  }
+  table.summary tr.today-row td:first-child{ color: var(--green-deep); font-weight:700; }
+  table.summary td.gastos{ color: var(--rust); }
+  table.summary td.bal.neg{ color: var(--rust); }
+  table.summary td.bal{ color: var(--green-deep); font-weight:600; }
+  table.summary tr.jumpable{ cursor:pointer; }
+  table.summary tr.jumpable:hover{ background: rgba(255,255,255,0.5); }
+  table.summary tfoot td{
+    padding-top: 10px;
+    border-top: 2px solid var(--green-deep);
+    font-weight:700;
+    font-size: 13.5px;
+    border-bottom: none;
+  }
+  .empty-hint{
+    font-family:'Inter';
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    font-style: italic;
+    padding: 4px 0 8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="book">
+  <div class="tab">Aklat <span class="sub">Ledger</span></div>
+  <h1>Hulog &amp; Gastos</h1>
+  <div class="dateline" id="dateline">loading…</div>
+
+  <div class="datebar">
+    <button class="navbtn" id="prevDay" title="Previous day">‹</button>
+    <input type="date" id="datePicker">
+    <button class="navbtn" id="nextDay" title="Next day">›</button>
+    <button class="today-btn" id="todayBtn">Today</button>
+    <button class="today-btn" id="summaryBtn" style="margin-left:auto;">📖 All Dates</button>
+  </div>
+
+  <section class="block" id="summarySection" style="display:none;">
+    <div class="block-head">
+      <span class="eyebrow">Overview</span>
+      <h2>Buod · Summary</h2>
+    </div>
+    <div id="summaryBody"><div class="empty-hint">Loading…</div></div>
+  </section>
+
+  <section class="block">
+    <div class="block-head">
+      <span class="eyebrow">Savings</span>
+      <h2>Hulog</h2>
+    </div>
+    <div class="savings-grid">
+      <div class="col">
+        <div class="col-title">Umaga · Morning</div>
+        <div id="morningRows"></div>
+        <div class="addrow">
+          <input type="text" id="morningNewName" placeholder="Add person…">
+          <button class="addbtn" data-slot="morning">Add</button>
+        </div>
+        <div class="col-total"><span>Total</span><span id="morningTotal">₱0.00</span></div>
+      </div>
+      <div class="col">
+        <div class="col-title">Gabi · Evening</div>
+        <div id="eveningRows"></div>
+        <div class="addrow">
+          <input type="text" id="eveningNewName" placeholder="Add person…">
+          <button class="addbtn" data-slot="evening">Add</button>
+        </div>
+        <div class="col-total"><span>Total</span><span id="eveningTotal">₱0.00</span></div>
+      </div>
+    </div>
+    <div class="savings-grand">Total Hulog Today: <span id="savingsGrand">₱0.00</span></div>
+  </section>
+
+  <section class="block">
+    <div class="block-head">
+      <span class="eyebrow">Expenses</span>
+      <h2>Gastos</h2>
+    </div>
+    <table class="ledger">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Umaga<br>1st</th>
+          <th>Tanghali<br>2nd</th>
+          <th>Gabi<br>3rd</th>
+          <th>Total</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="expenseRows"></tbody>
+      <tfoot>
+        <tr>
+          <td>Column totals</td>
+          <td id="colTotal0">₱0.00</td>
+          <td id="colTotal1">₱0.00</td>
+          <td id="colTotal2">₱0.00</td>
+          <td class="grand" id="expenseGrand">₱0.00</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="addrow" style="margin-top:12px;">
+      <input type="text" id="catNewName" placeholder="Add expense category… (e.g. Food, Fare, Load)">
+      <button class="addbtn" id="addCatBtn">Add</button>
+    </div>
+  </section>
+
+  <div class="netband">
+    <span class="label">Balance today (Hulog − Gastos)</span>
+    <span class="value" id="netValue">₱0.00</span>
+  </div>
+
+  <div class="foot-note">Saved on this device only, for this date. Switch dates above to see other days.</div>
+</div>
+
+<button id="installBtn" style="display:none;position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:50;font-family:'Inter';font-weight:700;font-size:14px;background:#1F4F38;color:#EDF2E6;border:none;border-radius:24px;padding:12px 22px;box-shadow:0 6px 18px rgba(0,0,0,0.3);cursor:pointer;">⬇ Install App</button>
+
+<script>
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  document.getElementById('installBtn').style.display = 'block';
+});
+document.getElementById('installBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('installBtn');
+  btn.style.display = 'none';
+  if(!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+});
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBtn').style.display = 'none';
+});
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.error('SW registration failed', err));
+  });
+}
+</script>
+<script>
+const PESO = n => '₱' + (Number(n)||0).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtDateKey = d => {
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${da}`;
+};
+const fmtDateLong = d => d.toLocaleDateString('en-PH', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+
+let config = { persons: [], categories: [] };
+let currentDate = new Date();
+let dayData = { savings: {morning:{}, evening:{}}, expenses: {} };
+
+// Storage layer: plain localStorage, so all data lives on this device/browser only.
+const store = {
+  get(key){
+    try{
+      const v = localStorage.getItem(key);
+      return v === null ? null : { value: v };
+    }catch(e){ return null; }
+  },
+  set(key, value){
+    try{ localStorage.setItem(key, value); return true; }
+    catch(e){ console.error('storage set failed', e); return false; }
+  },
+  list(prefix){
+    const keys = [];
+    try{
+      for(let i=0;i<localStorage.length;i++){
+        const k = localStorage.key(i);
+        if(k && k.startsWith(prefix)) keys.push(k);
+      }
+    }catch(e){ /* ignore */ }
+    return keys;
+  }
+};
+
+async function loadConfig(){
+  const res = store.get('config');
+  config = res ? JSON.parse(res.value) : { persons: [], categories: [] };
+}
+async function saveConfig(){
+  store.set('config', JSON.stringify(config));
+}
+async function loadDay(dateKey){
+  const res = store.get('day:'+dateKey);
+  dayData = res ? JSON.parse(res.value) : { savings:{morning:{}, evening:{}}, expenses:{} };
+  if(!dayData.savings) dayData.savings = {morning:{}, evening:{}};
+  if(!dayData.savings.morning) dayData.savings.morning = {};
+  if(!dayData.savings.evening) dayData.savings.evening = {};
+  if(!dayData.expenses) dayData.expenses = {};
+}
+async function saveDay(){
+  store.set('day:'+fmtDateKey(currentDate), JSON.stringify(dayData));
+}
+
+function renderSavingsCol(slot){
+  const container = document.getElementById(slot+'Rows');
+  container.innerHTML = '';
+  if(config.persons.length === 0){
+    container.innerHTML = '<div class="empty-hint">No one added yet. Add a person below.</div>';
+  }
+  config.persons.forEach(name => {
+    const val = dayData.savings[slot][name] ?? '';
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `
+      <span class="name">${escapeHtml(name)}</span>
+      <span class="peso">₱</span>
+      <input type="number" step="0.01" min="0" class="amt" value="${val}" data-slot="${slot}" data-person="${escapeAttr(name)}">
+      <button class="del" data-remove-person="${escapeAttr(name)}" title="Remove person">✕</button>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function renderExpenseRows(){
+  const tbody = document.getElementById('expenseRows');
+  tbody.innerHTML = '';
+  if(config.categories.length === 0){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="6" class="empty-hint">No categories yet. Add one below (e.g. Food, Fare, Load).</td>`;
+    tbody.appendChild(tr);
+  }
+  config.categories.forEach(cat => {
+    const vals = dayData.expenses[cat] || ['','',''];
+    const rowTotal = vals.reduce((s,v)=>s+(Number(v)||0),0);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="catname">${escapeHtml(cat)}</td>
+      <td><input type="number" step="0.01" min="0" class="amt" value="${vals[0] ?? ''}" data-cat="${escapeAttr(cat)}" data-idx="0"></td>
+      <td><input type="number" step="0.01" min="0" class="amt" value="${vals[1] ?? ''}" data-cat="${escapeAttr(cat)}" data-idx="1"></td>
+      <td><input type="number" step="0.01" min="0" class="amt" value="${vals[2] ?? ''}" data-cat="${escapeAttr(cat)}" data-idx="2"></td>
+      <td class="rowtotal">${PESO(rowTotal)}</td>
+      <td><button class="del" data-remove-cat="${escapeAttr(cat)}" title="Remove category">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function computeTotals(){
+  const morningTotal = config.persons.reduce((s,p)=>s+(Number(dayData.savings.morning[p])||0),0);
+  const eveningTotal = config.persons.reduce((s,p)=>s+(Number(dayData.savings.evening[p])||0),0);
+  document.getElementById('morningTotal').textContent = PESO(morningTotal);
+  document.getElementById('eveningTotal').textContent = PESO(eveningTotal);
+  document.getElementById('savingsGrand').textContent = PESO(morningTotal+eveningTotal);
+
+  const colTotals = [0,0,0];
+  let expenseGrand = 0;
+  config.categories.forEach(cat => {
+    const vals = dayData.expenses[cat] || ['','',''];
+    for(let i=0;i<3;i++){ colTotals[i] += Number(vals[i])||0; }
+  });
+  colTotals.forEach((t,i)=>{ document.getElementById('colTotal'+i).textContent = PESO(t); expenseGrand += t; });
+  document.getElementById('expenseGrand').textContent = PESO(expenseGrand);
+
+  const net = (morningTotal+eveningTotal) - expenseGrand;
+  const netEl = document.getElementById('netValue');
+  netEl.textContent = (net<0? '−':'') + PESO(Math.abs(net));
+  netEl.classList.toggle('neg', net<0);
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+
+async function renderAll(){
+  document.getElementById('dateline').textContent = fmtDateLong(currentDate);
+  document.getElementById('datePicker').value = fmtDateKey(currentDate);
+  renderSavingsCol('morning');
+  renderSavingsCol('evening');
+  renderExpenseRows();
+  computeTotals();
+}
+
+async function goToDate(d){
+  currentDate = d;
+  await loadDay(fmtDateKey(currentDate));
+  await renderAll();
+}
+
+document.addEventListener('input', async (e) => {
+  if(e.target.matches('input.amt[data-slot]')){
+    const slot = e.target.dataset.slot, person = e.target.dataset.person;
+    dayData.savings[slot][person] = e.target.value === '' ? '' : Number(e.target.value);
+    computeTotals();
+    await saveDay();
+  }
+  if(e.target.matches('input.amt[data-cat]')){
+    const cat = e.target.dataset.cat, idx = Number(e.target.dataset.idx);
+    if(!dayData.expenses[cat]) dayData.expenses[cat] = ['','',''];
+    dayData.expenses[cat][idx] = e.target.value === '' ? '' : Number(e.target.value);
+    computeTotals();
+    await saveDay();
+  }
+});
+
+document.addEventListener('click', async (e) => {
+  if(e.target.matches('.addbtn[data-slot]')){
+    const slot = e.target.dataset.slot;
+    const input = document.getElementById(slot+'NewName');
+    const name = input.value.trim();
+    if(!name) return;
+    if(!config.persons.includes(name)) config.persons.push(name);
+    input.value = '';
+    await saveConfig();
+    await renderAll();
+  }
+  if(e.target.id === 'addCatBtn'){
+    const input = document.getElementById('catNewName');
+    const name = input.value.trim();
+    if(!name) return;
+    if(!config.categories.includes(name)) config.categories.push(name);
+    input.value = '';
+    await saveConfig();
+    await renderAll();
+  }
+  if(e.target.matches('[data-remove-person]')){
+    const name = e.target.dataset.removePerson;
+    if(!confirm(`Remove "${name}" from the savings list?`)) return;
+    config.persons = config.persons.filter(p => p !== name);
+    await saveConfig();
+    await renderAll();
+  }
+  if(e.target.matches('[data-remove-cat]')){
+    const name = e.target.dataset.removeCat;
+    if(!confirm(`Remove "${name}" from expense categories?`)) return;
+    config.categories = config.categories.filter(c => c !== name);
+    await saveConfig();
+    await renderAll();
+  }
+  if(e.target.id === 'prevDay'){
+    const d = new Date(currentDate); d.setDate(d.getDate()-1);
+    await goToDate(d);
+  }
+  if(e.target.id === 'nextDay'){
+    const d = new Date(currentDate); d.setDate(d.getDate()+1);
+    await goToDate(d);
+  }
+  if(e.target.id === 'todayBtn'){
+    await goToDate(new Date());
+  }
+});
+
+function sumDay(d){
+  let savings = 0;
+  if(d.savings){
+    ['morning','evening'].forEach(slot=>{
+      const obj = d.savings[slot] || {};
+      Object.values(obj).forEach(v => savings += Number(v)||0);
+    });
+  }
+  let expenses = 0;
+  if(d.expenses){
+    Object.values(d.expenses).forEach(arr => {
+      (arr||[]).forEach(v => expenses += Number(v)||0);
+    });
+  }
+  return { savings, expenses, net: savings - expenses };
+}
+
+async function loadSummary(){
+  const body = document.getElementById('summaryBody');
+  body.innerHTML = '<div class="empty-hint">Loading…</div>';
+  const keys = store.list('day:');
+  if(!keys.length){
+    body.innerHTML = '<div class="empty-hint">No entries yet. Fill in a day above to see it here.</div>';
+    return;
+  }
+  const dateKeys = keys.map(k => k.replace(/^day:/,'')).sort();
+  const rows = [];
+  for(const dk of dateKeys){
+    try{
+      const res = store.get('day:'+dk);
+      const d = res ? JSON.parse(res.value) : null;
+      if(!d) continue;
+      rows.push({ date: dk, ...sumDay(d) });
+    }catch(e){ /* skip unreadable entry */ }
+  }
+  const todayKey = fmtDateKey(new Date());
+  const grand = rows.reduce((acc,r)=>({
+    savings: acc.savings + r.savings,
+    expenses: acc.expenses + r.expenses,
+    net: acc.net + r.net
+  }), {savings:0, expenses:0, net:0});
+
+  let html = `<table class="summary"><thead><tr>
+      <th>Date</th><th>Hulog</th><th>Gastos</th><th>Balance</th>
+    </tr></thead><tbody>`;
+  rows.forEach(r => {
+    const dObj = new Date(r.date+'T00:00:00');
+    const label = dObj.toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'});
+    const isToday = r.date === todayKey;
+    html += `<tr class="jumpable${isToday?' today-row':''}" data-jump="${r.date}">
+      <td>${label}${isToday?' · today':''}</td>
+      <td>${PESO(r.savings)}</td>
+      <td class="gastos">${PESO(r.expenses)}</td>
+      <td class="bal${r.net<0?' neg':''}">${r.net<0?'−':''}${PESO(Math.abs(r.net))}</td>
+    </tr>`;
+  });
+  html += `</tbody><tfoot><tr>
+      <td>Grand total</td>
+      <td>${PESO(grand.savings)}</td>
+      <td class="gastos">${PESO(grand.expenses)}</td>
+      <td class="bal${grand.net<0?' neg':''}">${grand.net<0?'−':''}${PESO(Math.abs(grand.net))}</td>
+    </tr></tfoot></table>`;
+  body.innerHTML = html;
+
+  body.querySelectorAll('tr.jumpable').forEach(tr => {
+    tr.addEventListener('click', async () => {
+      const [y,m,d] = tr.dataset.jump.split('-').map(Number);
+      document.getElementById('summarySection').style.display = 'none';
+      await goToDate(new Date(y, m-1, d));
+    });
+  });
+}
+
+document.getElementById('summaryBtn').addEventListener('click', async () => {
+  const sec = document.getElementById('summarySection');
+  const showing = sec.style.display !== 'none';
+  sec.style.display = showing ? 'none' : 'block';
+  if(!showing) await loadSummary();
+});
+
+document.getElementById('datePicker').addEventListener('change', async (e) => {
+  const [y,m,d] = e.target.value.split('-').map(Number);
+  await goToDate(new Date(y, m-1, d));
+});
+
+document.querySelectorAll('.addrow input[type="text"]').forEach(inp => {
+  inp.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      const btn = inp.parentElement.querySelector('.addbtn');
+      if(btn) btn.click();
+    }
+  });
+});
+
+(async function init(){
+  await loadConfig();
+  await goToDate(new Date());
+})();
+</script>
+</body>
+</html>
