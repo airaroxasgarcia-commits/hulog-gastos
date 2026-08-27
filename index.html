@@ -1079,7 +1079,7 @@ function renderDaySummary(){
     gastosGrand += rowTotal;
     const row = document.createElement('div');
     row.className = 'receipt-row';
-    row.innerHTML = `<span class="receipt-name">${escapeHtml(cat)}</span><span class="receipt-amt">${PESO(rowTotal)}</span>`;
+    row.innerHTML = `<div class="receipt-row-main"><span class="receipt-name">${escapeHtml(cat)}</span><span class="receipt-amt">${PESO(rowTotal)}</span></div>`;
     gastosRowsEl.appendChild(row);
   });
   document.getElementById('receiptGastosTotal').textContent = PESO(gastosGrand);
