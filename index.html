@@ -477,12 +477,22 @@
     margin: 14px 0 6px;
   }
   .receipt-row{
-    display:flex;
-    justify-content:space-between;
-    gap:10px;
     font-size: 14px;
     padding: 4px 0;
     border-bottom: 1px dotted rgba(75,90,86,0.35);
+  }
+  .receipt-row-main{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .receipt-breakdown{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    opacity: 0.85;
+    margin-top: 2px;
+    word-break: break-word;
   }
   .receipt-name{ color: var(--ink); }
   .receipt-amt{ font-family:'IBM Plex Mono', monospace; color: var(--ink-soft); white-space:nowrap; }
@@ -924,6 +934,43 @@ function dateRangeKeys(startDate, endDate){
   return keys;
 }
 
+// Sum each person's hulog (morning+evening) per day across the range, keeping
+// a day-by-day breakdown (0 for any day/slot they have no entry) so gaps —
+// like a missing hulog on a particular date — are visible in the summary
+// instead of being silently skipped. Every person added to the Umaga/Gabi
+// lists is included even if their total across the whole range is 0.
+function computeRangePersonBreakdown(dateKeys){
+  const order = [];
+  ['morning','evening'].forEach(slot=>{
+    config.persons[slot].forEach(n=>{ if(!order.includes(n)) order.push(n); });
+  });
+  const perDay = dateKeys.map(dk => loadDayRaw(dk));
+  perDay.forEach(d=>{
+    if(!d || !d.savings) return;
+    ['morning','evening'].forEach(slot=>{
+      Object.keys(d.savings[slot] || {}).forEach(name=>{
+        if(!order.includes(name)) order.push(name);
+      });
+    });
+  });
+  const breakdown = {};
+  const totals = {};
+  order.forEach(name=>{
+    const amounts = perDay.map(d=>{
+      let sum = 0;
+      if(d && d.savings){
+        ['morning','evening'].forEach(slot=>{
+          sum += Number((d.savings[slot]||{})[name]) || 0;
+        });
+      }
+      return sum;
+    });
+    breakdown[name] = amounts;
+    totals[name] = amounts.reduce((s,v)=>s+v, 0);
+  });
+  return { totals, order, breakdown };
+}
+
 // Sum each person's hulog (morning+evening) across every day in the range.
 function computeRangePersonTotals(dateKeys){
   const totals = {};
@@ -967,7 +1014,7 @@ let receiptFileTag = '';
 
 function renderDaySummary(){
   const rangeMode = document.getElementById('rangeModeToggle').checked;
-  let dateLabel, personTotals, names, catTotals, cats;
+  let dateLabel, personTotals, names, catTotals, cats, personBreakdown = null;
 
   if(rangeMode){
     const startVal = document.getElementById('rangeStart').value;
@@ -984,7 +1031,7 @@ function renderDaySummary(){
     dateLabel = keys.length === 1 ? startLabel : `${startLabel} – ${endLabel} · ${keys.length} days`;
     receiptFileTag = keys.length === 1 ? keys[0] : `${keys[0]}_to_${keys[keys.length-1]}`;
 
-    ({ totals: personTotals, order: names } = computeRangePersonTotals(keys));
+    ({ totals: personTotals, order: names, breakdown: personBreakdown } = computeRangePersonBreakdown(keys));
     ({ totals: catTotals, order: cats } = computeRangeCategoryTotals(keys));
   } else {
     dateLabel = fmtDateLong(currentDate);
@@ -1011,7 +1058,12 @@ function renderDaySummary(){
     hulogGrand += val;
     const row = document.createElement('div');
     row.className = 'receipt-row';
-    row.innerHTML = `<span class="receipt-name">${escapeHtml(name)}</span><span class="receipt-amt">${PESO(val)}</span>`;
+    let breakdownHtml = '';
+    if(personBreakdown && personBreakdown[name] && personBreakdown[name].length > 1){
+      const expr = personBreakdown[name].map(v => Math.round((Number(v)||0)*100)/100).join(' + ');
+      breakdownHtml = `<div class="receipt-breakdown">${expr} = ${PESO(val)}</div>`;
+    }
+    row.innerHTML = `<div class="receipt-row-main"><span class="receipt-name">${escapeHtml(name)}</span><span class="receipt-amt">${PESO(val)}</span></div>${breakdownHtml}`;
     hulogRowsEl.appendChild(row);
   });
   document.getElementById('receiptHulogTotal').textContent = PESO(hulogGrand);
