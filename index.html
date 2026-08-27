@@ -1010,11 +1010,38 @@ function computeRangeCategoryTotals(dateKeys){
   return { totals, order };
 }
 
+// Same idea as computeRangePersonBreakdown, but for expense categories: each
+// day's 3 slot amounts (Umaga/Tanghali/Gabi) are combined into that day's
+// category total, then those daily totals are what gets added up across the
+// range — so a category with no gastos on a given day shows 0 for that day
+// instead of being silently skipped.
+function computeRangeCategoryBreakdown(dateKeys){
+  const order = [...config.categories];
+  const perDay = dateKeys.map(dk => loadDayRaw(dk));
+  perDay.forEach(d=>{
+    if(!d || !d.expenses) return;
+    Object.keys(d.expenses).forEach(cat=>{
+      if(!order.includes(cat)) order.push(cat);
+    });
+  });
+  const breakdown = {};
+  const totals = {};
+  order.forEach(cat=>{
+    const amounts = perDay.map(d=>{
+      if(!d || !d.expenses || !d.expenses[cat]) return 0;
+      return (d.expenses[cat] || []).reduce((s,v)=>s+(Number(v)||0), 0);
+    });
+    breakdown[cat] = amounts;
+    totals[cat] = amounts.reduce((s,v)=>s+v, 0);
+  });
+  return { totals, order, breakdown };
+}
+
 let receiptFileTag = '';
 
 function renderDaySummary(){
   const rangeMode = document.getElementById('rangeModeToggle').checked;
-  let dateLabel, personTotals, names, catTotals, cats, personBreakdown = null;
+  let dateLabel, personTotals, names, catTotals, cats, personBreakdown = null, catBreakdown = null;
 
   if(rangeMode){
     const startVal = document.getElementById('rangeStart').value;
@@ -1032,7 +1059,7 @@ function renderDaySummary(){
     receiptFileTag = keys.length === 1 ? keys[0] : `${keys[0]}_to_${keys[keys.length-1]}`;
 
     ({ totals: personTotals, order: names, breakdown: personBreakdown } = computeRangePersonBreakdown(keys));
-    ({ totals: catTotals, order: cats } = computeRangeCategoryTotals(keys));
+    ({ totals: catTotals, order: cats, breakdown: catBreakdown } = computeRangeCategoryBreakdown(keys));
   } else {
     dateLabel = fmtDateLong(currentDate);
     receiptFileTag = fmtDateKey(currentDate);
@@ -1079,7 +1106,12 @@ function renderDaySummary(){
     gastosGrand += rowTotal;
     const row = document.createElement('div');
     row.className = 'receipt-row';
-    row.innerHTML = `<div class="receipt-row-main"><span class="receipt-name">${escapeHtml(cat)}</span><span class="receipt-amt">${PESO(rowTotal)}</span></div>`;
+    let catBreakdownHtml = '';
+    if(catBreakdown && catBreakdown[cat] && catBreakdown[cat].length > 1){
+      const expr = catBreakdown[cat].map(v => Math.round((Number(v)||0)*100)/100).join(' + ');
+      catBreakdownHtml = `<div class="receipt-breakdown">${expr} = ${PESO(rowTotal)}</div>`;
+    }
+    row.innerHTML = `<div class="receipt-row-main"><span class="receipt-name">${escapeHtml(cat)}</span><span class="receipt-amt">${PESO(rowTotal)}</span></div>${catBreakdownHtml}`;
     gastosRowsEl.appendChild(row);
   });
   document.getElementById('receiptGastosTotal').textContent = PESO(gastosGrand);
