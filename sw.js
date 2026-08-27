@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hulog-gastos-v3';
+const CACHE_NAME = 'hulog-gastos-v4';
 const CORE_ASSETS = [
   './',
   './index.html',
